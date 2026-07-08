@@ -12,6 +12,142 @@ die() {
   exit 1
 }
 
+if [ "${CHEAPLOOP_SNAPSHOT:-}" != "1" ]; then
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || die "cannot resolve script dir"
+  repo_root="$(cd "$script_dir/.." && pwd)" || die "cannot resolve repo root"
+  export CHEAPLOOP_ROOT="$repo_root"
+
+  snapshot_path="$(mktemp "${TMPDIR:-/tmp}/cheaploop-dispatch.XXXXXX")" || die "cannot create dispatch snapshot"
+  cp "${BASH_SOURCE[0]}" "$snapshot_path" || die "cannot copy dispatch snapshot"
+  chmod +x "$snapshot_path" || die "cannot make dispatch snapshot executable"
+  export CHEAPLOOP_SNAPSHOT=1
+  export CHEAPLOOP_SNAPSHOT_PATH="$snapshot_path"
+  exec "$snapshot_path" "$@"
+  die "cannot exec dispatch snapshot"
+fi
+
+if [ -n "${CHEAPLOOP_SNAPSHOT_PATH:-}" ]; then
+  trap 'rm -f "${CHEAPLOOP_SNAPSHOT_PATH:-}"' EXIT HUP INT TERM
+fi
+
+orca_temp_file() {
+  mktemp "${TMPDIR:-/tmp}/cheaploop-orca.XXXXXX"
+}
+
+orca_run_to_file() {
+  local output_file=$1
+  local stderr_file
+  shift
+
+  command -v orca >/dev/null 2>&1 || return 1
+  : > "$output_file" || return 1
+  stderr_file="$(orca_temp_file)" || return 1
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 2 orca "$@" > "$output_file" 2> "$stderr_file"
+    local timeout_status=$?
+    rm -f "$stderr_file"
+    return "$timeout_status"
+  fi
+
+  orca "$@" > "$output_file" 2> "$stderr_file" &
+  local orca_pid=$!
+  (
+    sleep 2
+    kill "$orca_pid" 2>/dev/null
+  ) >/dev/null 2>&1 &
+  local orca_watchdog_pid=$!
+
+  wait "$orca_pid"
+  local orca_status=$?
+  kill "$orca_watchdog_pid" 2>/dev/null
+  wait "$orca_watchdog_pid" 2>/dev/null
+  rm -f "$stderr_file"
+  return "$orca_status"
+}
+
+orca_extract_task_id() {
+  python3 -c '
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+paths = (
+    ("result", "task", "id"),
+    ("result", "taskId"),
+    ("result", "task_id"),
+    ("result", "id"),
+    ("task", "id"),
+    ("taskId",),
+    ("task_id",),
+)
+
+for path in paths:
+    value = data
+    for key in path:
+        if not isinstance(value, dict) or key not in value:
+            value = None
+            break
+        value = value[key]
+    if isinstance(value, str) and value:
+        print(value)
+        sys.exit(0)
+
+sys.exit(1)
+'
+}
+
+orca_mirror_start() {
+  local mirror_task_id=$1
+  local create_output_file
+  local mirror_orca_task_id
+
+  create_output_file="$(orca_temp_file)" || return 0
+  orca_run_to_file "$create_output_file" orchestration task-create --spec "$mirror_task_id" --task-title "$mirror_task_id" --display-name "$mirror_task_id" --json || {
+    rm -f "$create_output_file"
+    return 0
+  }
+  mirror_orca_task_id="$(orca_extract_task_id < "$create_output_file" 2>/dev/null)" || {
+    rm -f "$create_output_file"
+    return 0
+  }
+  rm -f "$create_output_file"
+  [ -n "$mirror_orca_task_id" ] || return 0
+
+  orca_mirror_update "$mirror_orca_task_id" dispatched "" || :
+  printf '%s\n' "$mirror_orca_task_id"
+}
+
+orca_mirror_update() {
+  local mirror_orca_task_id=$1
+  local mirror_status=$2
+  local mirror_result=$3
+  local update_output_file
+
+  update_output_file="$(orca_temp_file)" || return 0
+  if [ -n "$mirror_result" ]; then
+    orca_run_to_file "$update_output_file" orchestration task-update --id "$mirror_orca_task_id" --status "$mirror_status" --result "$mirror_result" --json || :
+  else
+    orca_run_to_file "$update_output_file" orchestration task-update --id "$mirror_orca_task_id" --status "$mirror_status" --json || :
+  fi
+  rm -f "$update_output_file"
+  return 0
+}
+
+orca_mirror_finish() {
+  local mirror_orca_task_id=$1
+  local mirror_status=$2
+  local mirror_result=$3
+
+  [ -n "$mirror_orca_task_id" ] || return 0
+  orca_mirror_update "$mirror_orca_task_id" "$mirror_status" "$mirror_result" || :
+  return 0
+}
+
 task_id=""
 task_type="build"
 model=""
@@ -58,8 +194,12 @@ if [ -n "$prompt_file" ]; then
   [ -f "$prompt_file" ] && [ -r "$prompt_file" ] || die "prompt file not readable: $prompt_file"
 fi
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || die "cannot resolve script dir"
-repo_root="$(cd "$script_dir/.." && pwd)" || die "cannot resolve repo root"
+if [ -n "${CHEAPLOOP_ROOT:-}" ]; then
+  repo_root="$CHEAPLOOP_ROOT"
+else
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || die "cannot resolve script dir"
+  repo_root="$(cd "$script_dir/.." && pwd)" || die "cannot resolve repo root"
+fi
 cd "$repo_root" || die "cannot enter repo root"
 
 result_dir=".cheaploop/results/$task_id"
@@ -70,13 +210,15 @@ prompt_tmp="$result_dir/prompt.$$"
 
 mkdir -p "$result_dir" || die "cannot create result dir: $result_dir"
 rm -f "$raw_log" "$result_json" "$codex_exit" "$prompt_tmp"
-trap 'rm -f "$prompt_tmp"' EXIT HUP INT TERM
+trap 'rm -f "$prompt_tmp" "${CHEAPLOOP_SNAPSHOT_PATH:-}"' EXIT HUP INT TERM
 
 if [ -n "$prompt_file" ]; then
   cp "$prompt_file" "$prompt_tmp" || die "cannot read prompt file"
 else
   cat > "$prompt_tmp" || die "cannot read prompt from stdin"
 fi
+
+orca_task_id="$(orca_mirror_start "$task_id")" || orca_task_id=""
 
 cmd=(codex exec --sandbox "$sandbox")
 [ -z "$model" ] || cmd+=(-m "$model")
@@ -114,8 +256,18 @@ except (OSError, ValueError) as exc:
     sys.exit(1)
 PY
 then
+  orca_mirror_finish "$orca_task_id" failed '{"status":"failed","summary":"no valid result"}'
   exit 1
+fi
+
+result_status="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("status", ""))' "$result_json" 2>/dev/null || printf 'failure')"
+if [ "$result_status" = "success" ]; then
+  orca_mirror_finish "$orca_task_id" completed "$(cat "$result_json")"
+else
+  orca_mirror_finish "$orca_task_id" failed "$(cat "$result_json")"
 fi
 
 cat "$result_json"
 exit 0
+
+

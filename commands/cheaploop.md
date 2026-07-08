@@ -11,7 +11,7 @@ If requirements, rubric, or acceptance criteria are unclear, ask via AskUserQues
 Right before dispatch, print the verdict line and a Unicode loop diagram for the chosen level.
 Generate each `TASK_ID` as `<slug>-<3-digit>`.
 Dispatch every worker through `scripts/dispatch.sh` with the task spec and selected model/effort.
-For multi-worker plans, run the pipeline through the Workflow tool — each agent stage invokes scripts/dispatch.sh via Bash — so progress is observable live in /workflows. Single-worker runs may call scripts/dispatch.sh directly.
+For multi-worker plans, run the pipeline through the Workflow tool — each agent stage invokes scripts/dispatch.sh via Bash — so progress is observable live in /workflows. Wrapper agents only relay a command, so give them the cheapest model (`model: 'haiku'`, `effort: 'low'`). Single-worker runs may call scripts/dispatch.sh directly.
 Optionally, when the orca CLI is available, mirror tasks via orca orchestration (task-create → dispatch → completion) for sidebar tracking — never required.
 Read only `.cheaploop/results/<task-id>/result.json`; never inspect raw worker output.
 If verification fails, retry implementation with feedback, up to 2 retries.
