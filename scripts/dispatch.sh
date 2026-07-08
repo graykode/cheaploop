@@ -20,9 +20,11 @@ require_command codex
 require_command python3
 
 if [ "${CHEAPLOOP_SNAPSHOT:-}" != "1" ]; then
+  launch_workdir="$(pwd)" || die "cannot resolve launch workdir"
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || die "cannot resolve script dir"
-  repo_root="$(cd "$script_dir/.." && pwd)" || die "cannot resolve repo root"
-  export CHEAPLOOP_ROOT="$repo_root"
+  script_root="$(cd "$script_dir/.." && pwd)" || die "cannot resolve script root"
+  export CHEAPLOOP_ROOT="$script_root"
+  export CHEAPLOOP_WORKDIR="$launch_workdir"
 
   snapshot_path="$(mktemp "${TMPDIR:-/tmp}/cheaploop-dispatch.XXXXXX")" || die "cannot create dispatch snapshot"
   cp "${BASH_SOURCE[0]}" "$snapshot_path" || {
@@ -116,12 +118,18 @@ if [ -n "$prompt_file" ]; then
 fi
 
 if [ -n "${CHEAPLOOP_ROOT:-}" ]; then
-  repo_root="$CHEAPLOOP_ROOT"
+  script_root="$CHEAPLOOP_ROOT"
 else
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || die "cannot resolve script dir"
-  repo_root="$(cd "$script_dir/.." && pwd)" || die "cannot resolve repo root"
+  script_root="$(cd "$script_dir/.." && pwd)" || die "cannot resolve script root"
 fi
-cd "$repo_root" || die "cannot enter repo root"
+
+if [ -n "${CHEAPLOOP_WORKDIR:-}" ]; then
+  workdir="$CHEAPLOOP_WORKDIR"
+else
+  workdir="$(pwd)" || die "cannot resolve workdir"
+fi
+cd "$workdir" || die "cannot enter workdir"
 
 result_dir=".cheaploop/results/$task_id"
 raw_log="$result_dir/raw.log"

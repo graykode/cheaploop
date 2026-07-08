@@ -1,0 +1,13 @@
+{
+  "name": "cheaploop",
+  "owner": {
+    "name": "graykode"
+  },
+  "plugins": [
+    {
+      "name": "cheaploop",
+      "source": "./",
+      "description": "Claude is the brain, Codex is the hands. One command decides the loop."
+    }
+  ]
+}
