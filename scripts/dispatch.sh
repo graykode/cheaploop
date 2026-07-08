@@ -19,6 +19,44 @@ require_command() {
 require_command codex
 require_command python3
 
+append_worker_result_contract() {
+  cat <<'CHEAPLOOP_WORKER_RESULT_CONTRACT'
+
+CHEAPLOOP WORKER RESULT CONTRACT
+
+Your final result must be a JSON object with exactly this result.json shape:
+
+{
+  "task_id": "copied verbatim from the dispatch prompt",
+  "status": "success | failure | blocked",
+  "summary": "3 sentences max - only decision-relevant facts",
+  "files_changed": [],
+  "artifacts": [],
+  "verification": {
+    "verdict": "pass | fail | n/a",
+    "findings": [
+      {
+        "file": "path",
+        "line": 12,
+        "issue": "one sentence"
+      }
+    ]
+  },
+  "next_steps": []
+}
+
+Rules:
+- status is exactly one of: success, failure, blocked.
+- verification is always an object.
+- Unless the task type is verify, set verification.verdict to "n/a".
+- Every key is always present: task_id, status, summary, files_changed, artifacts, verification, next_steps.
+- Empty arrays are allowed. Do not omit keys.
+
+Hard output rule:
+The LAST thing you print MUST be a single fenced code block tagged exactly ```json (three backticks + the word json, nothing else) containing only the result object. No prose after it.
+CHEAPLOOP_WORKER_RESULT_CONTRACT
+}
+
 if [ "${CHEAPLOOP_SNAPSHOT:-}" != "1" ]; then
   launch_workdir="$(pwd)" || die "cannot resolve launch workdir"
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || die "cannot resolve script dir"
@@ -166,6 +204,7 @@ if [ -n "$prompt_file" ]; then
 else
   cat > "$prompt_tmp" || die "cannot read prompt from stdin"
 fi
+append_worker_result_contract >> "$prompt_tmp" || die "cannot append worker result contract"
 
 cmd=(codex exec --sandbox "$sandbox")
 [ -z "$model" ] || cmd+=(-m "$model")
@@ -182,12 +221,79 @@ import sys
 
 raw_path, result_path, expected_task_id = sys.argv[1:4]
 try:
-    text = open(raw_path, "r", encoding="utf-8", errors="replace").read()
-    blocks = re.findall(r"```json\s*(.*?)```", text, flags=re.DOTALL)
-    if not blocks:
-        raise ValueError("no json fenced block found")
-    payload = blocks[-1].strip()
-    data = json.loads(payload)
+    raw_text = open(raw_path, "r", encoding="utf-8", errors="replace").read()
+    text = re.sub(r"\\\r?\n", "", raw_text)
+
+    def parse_matching_payload(payloads):
+        saw_parseable = False
+        saw_task_mismatch = False
+        saw_non_object = False
+        selected = None
+        for payload in payloads:
+            try:
+                parsed = json.loads(payload.strip())
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(parsed, dict):
+                saw_non_object = True
+                continue
+            saw_parseable = True
+            if parsed.get("task_id") == expected_task_id:
+                selected = (payload.strip(), parsed)
+            else:
+                saw_task_mismatch = True
+        return selected, saw_parseable, saw_task_mismatch, saw_non_object
+
+    fenced_blocks = re.findall(
+        r"```[ \t]*(?:json|result\.json|jsonc)\b[^\r\n]*\r?\n(.*?)```",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    selected, saw_parseable, saw_task_mismatch, saw_non_object = parse_matching_payload(fenced_blocks)
+
+    def balanced_json_objects(source):
+        starts = [index for index, char in enumerate(source) if char == "{"]
+        for start in starts:
+            depth = 0
+            in_string = False
+            escaped = False
+            for index in range(start, len(source)):
+                char = source[index]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == '"':
+                        in_string = False
+                    continue
+                if char == '"':
+                    in_string = True
+                elif char == "{":
+                    depth += 1
+                elif char == "}":
+                    depth -= 1
+                    if depth == 0:
+                        yield source[start : index + 1]
+                        break
+
+    if selected is None and not saw_parseable:
+        brace_selected, brace_parseable, brace_mismatch, brace_non_object = parse_matching_payload(
+            balanced_json_objects(text)
+        )
+        selected = brace_selected
+        saw_parseable = brace_parseable
+        saw_task_mismatch = brace_mismatch
+        saw_non_object = brace_non_object
+
+    if selected is None:
+        if saw_task_mismatch:
+            raise ValueError("result task_id mismatch")
+        if saw_non_object:
+            raise ValueError("result json must be an object")
+        raise ValueError("no parseable result json found")
+
+    payload, data = selected
     if not isinstance(data, dict):
         raise ValueError("result json must be an object")
     required_keys = (
