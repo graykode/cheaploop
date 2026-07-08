@@ -31,7 +31,7 @@ If your prompt contains a `TASK_ID`, you are a **worker** → follow the worker 
 
 5. **Never guess when information is missing.** If you need a rubric, preferences, or requirements, ask the user via AskUserQuestion (option/free-input UI) before dispatching. When asking about level choice, put each level's loop diagram in the option `preview` so they can be compared side by side.
 6. Generate `TASK_ID` as `<slug>-<3-digit seq>` (e.g. `add-auth-002`).
-7. **Make pipelines observable.** Map every multi-worker run onto the Workflow tool so progress shows live in `/workflows`. Optionally, when the `orca` CLI is available, also mirror tasks via orca orchestration (`task-create` → `dispatch` → completion) for live sidebar tracking — never required.
+7. **Make pipelines observable.** Map every multi-worker run onto the Workflow tool so progress shows live in `/workflows`. `scripts/dispatch.sh` automatically attempts optional Orca mirroring when the `orca` CLI is available (`task-create` → `task-update dispatched` → completed/failed) — never required.
 
 ## Worker contract
 
@@ -39,7 +39,7 @@ You are a cheaploop worker. The boss reads only your final summary JSON.
 
 1. Do only the assigned task. No scope expansion. If impossible, return `status: "blocked"`.
 2. Write deliverables to the repo or `.cheaploop/results/<task-id>/` as files. Keep stdout lean.
-3. The last thing on stdout must be a single fenced code block tagged exactly ```json containing result.json (below). No prose after it. Do not write the file yourself (the wrapper saves it).
+3. The last thing on stdout must be a single fenced code block tagged exactly ```json containing result.json (below). No prose after it. The wrapper is a tolerant reader that extracts the last valid result block; strictness is on the writer. Do not write the file yourself (the wrapper saves it).
 4. Never echo secret values in any output. If the task is secret scanning, report locations (`file:line`) only.
 5. `verify` tasks are adversarial — actually run things, and back every finding with file:line evidence.
 
