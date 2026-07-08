@@ -61,8 +61,8 @@ Every key is always present (empty arrays / `null`, never omitted). `status` is 
 
 ```
 AGENTS.md      # single source of truth (CLAUDE.md is one line: @AGENTS.md)
-commands/      # /cheaploop single entry point (planned)
-scripts/       # dispatch.sh — codex exec wrapper + result.json capture (planned)
+commands/      # /cheaploop single entry point
+scripts/       # dispatch.sh — codex exec wrapper + result.json capture
 .cheaploop/    # runtime (gitignored) — results/
 ```
 
