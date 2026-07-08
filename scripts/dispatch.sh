@@ -4,7 +4,7 @@ set -u
 set -o pipefail
 
 usage() {
-  printf '%s\n' "usage: scripts/dispatch.sh -t <task-id> [-y build|research|verify] [-m <model>] [-e low|medium|high|xhigh] [-p <prompt-file>]" >&2
+  printf '%s\n' "usage: scripts/dispatch.sh -t <task-id> [-T] [-y build|research|verify] [-m <model>] [-e low|medium|high|xhigh] [-p <prompt-file>]" >&2
 }
 
 die() {
@@ -78,10 +78,25 @@ orca_temp_file() {
   mktemp "${TMPDIR:-/tmp}/cheaploop-orca.XXXXXX"
 }
 
-orca_run_to_file() {
-  local output_file=$1
+shell_quote() {
+  printf '%q' "$1"
+}
+
+shell_join() {
+  local arg
+  local joined=""
+
+  for arg in "$@"; do
+    joined="${joined}${joined:+ }$(shell_quote "$arg")"
+  done
+  printf '%s' "$joined"
+}
+
+orca_run_to_file_with_guard() {
+  local guard_seconds=$1
+  local output_file=$2
   local stderr_file
-  shift
+  shift 2
 
   command -v orca >/dev/null 2>&1 || return 1
   : > "$output_file" || return 1
@@ -89,7 +104,7 @@ orca_run_to_file() {
   track_temp_file "$stderr_file"
 
   if command -v timeout >/dev/null 2>&1; then
-    timeout 2 orca "$@" > "$output_file" 2> "$stderr_file"
+    timeout "$guard_seconds" orca "$@" > "$output_file" 2> "$stderr_file"
     local timeout_status=$?
     rm -f "$stderr_file"
     return "$timeout_status"
@@ -98,7 +113,7 @@ orca_run_to_file() {
   orca "$@" > "$output_file" 2> "$stderr_file" &
   local orca_pid=$!
   (
-    sleep 2
+    sleep "$guard_seconds"
     kill "$orca_pid" 2>/dev/null
   ) >/dev/null 2>&1 &
   local orca_watchdog_pid=$!
@@ -109,6 +124,13 @@ orca_run_to_file() {
   wait "$orca_watchdog_pid" 2>/dev/null
   rm -f "$stderr_file"
   return "$orca_status"
+}
+
+orca_run_to_file() {
+  local output_file=$1
+  shift
+
+  orca_run_to_file_with_guard 2 "$output_file" "$@"
 }
 
 orca_extract_task_id() {
@@ -144,6 +166,90 @@ for path in paths:
 
 sys.exit(1)
 '
+}
+
+orca_extract_terminal_handle() {
+  python3 -c '
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+paths = (
+    ("result", "terminal", "handle"),
+    ("result", "handle"),
+    ("terminal", "handle"),
+    ("handle",),
+)
+
+for path in paths:
+    value = data
+    for key in path:
+        if not isinstance(value, dict) or key not in value:
+            value = None
+            break
+        value = value[key]
+    if isinstance(value, str) and value:
+        print(value)
+        sys.exit(0)
+
+sys.exit(1)
+'
+}
+
+orca_terminal_close() {
+  local terminal_handle=$1
+  local close_output_file
+
+  close_output_file="$(orca_temp_file)" || return 1
+  track_temp_file "$close_output_file"
+  orca_run_to_file "$close_output_file" terminal close --terminal "$terminal_handle" --json || {
+    rm -f "$close_output_file"
+    return 1
+  }
+  rm -f "$close_output_file"
+  return 0
+}
+
+orca_terminal_run_codex() {
+  local terminal_command=$1
+  local create_output_file
+  local wait_output_file
+  local terminal_handle
+
+  command -v orca >/dev/null 2>&1 || return 1
+
+  create_output_file="$(orca_temp_file)" || return 1
+  track_temp_file "$create_output_file"
+  orca_run_to_file "$create_output_file" terminal create --worktree active --title "cheaploop:$task_id" --command "$terminal_command" --json || {
+    rm -f "$create_output_file"
+    return 1
+  }
+
+  terminal_handle="$(orca_extract_terminal_handle < "$create_output_file" 2>/dev/null)" || {
+    rm -f "$create_output_file"
+    return 1
+  }
+  rm -f "$create_output_file"
+  [ -n "$terminal_handle" ] || return 1
+
+  wait_output_file="$(orca_temp_file)" || {
+    orca_terminal_close "$terminal_handle" >/dev/null 2>&1 || :
+    return 1
+  }
+  track_temp_file "$wait_output_file"
+  orca_run_to_file_with_guard 1805 "$wait_output_file" terminal wait --terminal "$terminal_handle" --for exit --timeout-ms 1800000 --json || {
+    rm -f "$wait_output_file"
+    orca_terminal_close "$terminal_handle" >/dev/null 2>&1 || :
+    return 1
+  }
+  rm -f "$wait_output_file"
+
+  orca_terminal_close "$terminal_handle" || return 1
+  return 0
 }
 
 orca_mirror_start() {
@@ -201,10 +307,12 @@ model=""
 effort=""
 prompt_file=""
 start_dir="$(pwd)"
+use_orca_terminal=0
 
-while getopts ":t:y:m:e:p:" opt; do
+while getopts ":t:Ty:m:e:p:" opt; do
   case "$opt" in
     t) task_id="$OPTARG" ;;
+    T) use_orca_terminal=1 ;;
     y) task_type="$OPTARG" ;;
     m) model="$OPTARG" ;;
     e) effort="$OPTARG" ;;
@@ -293,9 +401,21 @@ orca_task_id="$(orca_mirror_start "$task_id")" || orca_task_id=""
 cmd=(codex exec --sandbox "$sandbox")
 [ -z "$model" ] || cmd+=(-m "$model")
 [ -z "$effort" ] || cmd+=(-c "model_reasoning_effort=$effort")
-"${cmd[@]}" < "$prompt_tmp" > "$raw_log" 2>&1
-codex_status=$?
-printf '%d\n' "$codex_status" > "$codex_exit" || die "cannot write codex exit status"
+
+ran_in_orca_terminal=0
+if [ "$use_orca_terminal" -eq 1 ] && command -v orca >/dev/null 2>&1; then
+  terminal_inner_command="cd $(shell_quote "$repo_root") && $(shell_join "${cmd[@]}") < $(shell_quote "$prompt_tmp") > $(shell_quote "$raw_log") 2>&1; printf %s \"\$?\" > $(shell_quote "$codex_exit")"
+  terminal_command="bash -lc $(shell_quote "$terminal_inner_command")"
+  if orca_terminal_run_codex "$terminal_command"; then
+    ran_in_orca_terminal=1
+  fi
+fi
+
+if [ "$ran_in_orca_terminal" -ne 1 ]; then
+  "${cmd[@]}" < "$prompt_tmp" > "$raw_log" 2>&1
+  codex_status=$?
+  printf '%d\n' "$codex_status" > "$codex_exit" || die "cannot write codex exit status"
+fi
 
 if ! python3 - "$raw_log" "$result_json" "$task_id" <<'PY'
 import json
