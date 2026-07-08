@@ -34,14 +34,23 @@ The loop levels follow LangChain's [The Art of Loop Engineering](https://www.lan
 
 ## Install
 
-This repo is packaged as a Claude Code plugin:
+**Prerequisites:** the [Codex CLI](https://github.com/openai/codex) on your `PATH` and authenticated (`codex login`), plus `python3`. cheaploop dispatches every worker through `codex exec`, so nothing runs without it.
 
-- `.claude-plugin/plugin.json` declares the plugin name, version, and description.
-- `commands/cheaploop.md` provides the `/cheaploop` command.
-- `scripts/dispatch.sh` is the Codex dispatch wrapper used by the command.
+In Claude Code, add the marketplace and install the plugin:
 
-The Codex CLI must be installed and available on `PATH`, because `scripts/dispatch.sh` runs `codex exec`.
-Run `codex login` before using cheaploop; the wrapper does not perform Codex authentication.
+```
+/plugin marketplace add graykode/cheaploop
+/plugin install cheaploop@graykode
+```
+
+To install from a local checkout instead of GitHub, point the marketplace at the path:
+
+```
+/plugin marketplace add /path/to/cheaploop
+/plugin install cheaploop@graykode
+```
+
+Then restart Claude Code when prompted. `/cheaploop` is now available in any project.
 
 ## Usage
 
