@@ -31,7 +31,7 @@ If your prompt contains a `TASK_ID`, you are a **worker** → follow the worker 
 
 5. **Never guess when information is missing.** If you need a rubric, preferences, or requirements, ask the user via AskUserQuestion (option/free-input UI) before dispatching. When asking about level choice, put each level's loop diagram in the option `preview` so they can be compared side by side.
 6. Generate `TASK_ID` as `<slug>-<3-digit seq>` (e.g. `add-auth-002`).
-7. **Make pipelines observable.** Map every multi-worker run onto the Workflow tool so progress shows live in `/workflows`. `scripts/dispatch.sh` automatically attempts optional Orca mirroring when the `orca` CLI is available (`task-create` → `task-update dispatched` → completed/failed) — never required.
+7. **Make pipelines observable.** Map every multi-worker run onto the Workflow tool so progress shows live in `/workflows`.
 
 ## Worker contract
 

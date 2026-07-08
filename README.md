@@ -69,8 +69,6 @@ Multi-worker plans are mapped onto Claude Code's built-in Workflow tool so progr
 
 `/workflows` nodes are thin Claude wrapper shims, because the harness cannot run OpenAI models as subagents. GPT workers run outside the tree through `codex exec`; the real worker model and token usage are recorded in each task's `raw.log`. Workflow labels should carry the real model name, such as `audit:shell [gpt-5.5]`, because the tree's model column can only show the Claude wrapper.
 
-When the `orca` CLI is available, `scripts/dispatch.sh` also attempts optional Orca task mirroring for sidebar tracking. Orca is never required; failures to mirror do not block dispatch.
-
 `raw.log` retention is a deliberate debugging tradeoff. Treat worker logs as sensitive.
 
 ## Repo layout
