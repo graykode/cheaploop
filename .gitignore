@@ -1,0 +1,17 @@
+# cheaploop runtime artifacts
+.cheaploop/
+.codex-home/
+
+# macOS filesystem noise
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Editor and workspace metadata
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
