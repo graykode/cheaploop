@@ -1,15 +1,17 @@
-# cheaploop
+# codex-first
 
 > Claude is the brain, Codex is the hands. One command decides the loop.
 
-cheaploop is a Claude Code-only plugin for pushing execution out of metered Claude subscription tokens and into flat-rate Codex worker runs. Claude stays the boss: it decomposes work, chooses the loop, asks for missing requirements, mediates verification, and integrates results. Codex does the hands-on coding and research, so worker execution is not the thing to economize.
+codex-first is a Claude Code-only plugin, formerly known as cheaploop, for pushing execution out of metered Claude subscription tokens and into flat-rate Codex worker runs. Claude stays the boss: it decomposes work, chooses the loop, asks for missing requirements, mediates verification, and integrates results. Codex does the hands-on coding and research, so worker execution is not the thing to economize.
+
+Inspired by steipete's [codex-first skill](https://github.com/steipete/agent-scripts/blob/main/skills/codex-first/SKILL.md); the loop levels follow LangChain's [The Art of Loop Engineering](https://www.langchain.com/blog/the-art-of-loop-engineering).
 
 ## How it works
 
-cheaploop splits each run into two roles:
+codex-first splits each run into two roles:
 
-- **Boss:** a Claude session without a `TASK_ID`. It reads `AGENTS.md`, chooses the loop level, model, and effort, dispatches workers, and reads only `.cheaploop/results/<task-id>/result.json`.
-- **Worker:** a Codex session with a `TASK_ID`. It performs only the assigned task, writes deliverables to the repo or `.cheaploop/results/<task-id>/`, and ends stdout with one fenced `json` block containing the result contract.
+- **Boss:** a Claude session without a `TASK_ID`. It reads `AGENTS.md`, chooses the loop level, model, and effort, dispatches workers, and reads only `.codex-first/results/<task-id>/result.json`.
+- **Worker:** a Codex session with a `TASK_ID`. It performs only the assigned task, writes deliverables to the repo or `.codex-first/results/<task-id>/`, and ends stdout with one fenced `json` block containing the result contract.
 
 The worker result contract is always:
 
@@ -25,7 +27,7 @@ The worker result contract is always:
 }
 ```
 
-The loop levels follow LangChain's [The Art of Loop Engineering](https://www.langchain.com/blog/the-art-of-loop-engineering):
+The loop levels are:
 
 1. **Agent Loop:** one worker executes the task.
 2. **Verification Loop:** implementation is followed by adversarial verification, with retries on failure.
@@ -34,30 +36,30 @@ The loop levels follow LangChain's [The Art of Loop Engineering](https://www.lan
 
 ## Install
 
-**Prerequisites:** the [Codex CLI](https://github.com/openai/codex) on your `PATH` and authenticated (`codex login`), plus `python3`. cheaploop dispatches every worker through `codex exec`, so nothing runs without it.
+**Prerequisites:** the [Codex CLI](https://github.com/openai/codex) on your `PATH` and authenticated (`codex login`), plus `python3`. codex-first dispatches every worker through `codex exec`, so nothing runs without it.
 
 In Claude Code, add the marketplace and install the plugin:
 
 ```
-/plugin marketplace add graykode/cheaploop
-/plugin install cheaploop@graykode
+/plugin marketplace add graykode/codex-first
+/plugin install codex-first@graykode
 ```
 
 To install from a local checkout instead of GitHub, point the marketplace at the path:
 
 ```
-/plugin marketplace add /path/to/cheaploop
-/plugin install cheaploop@graykode
+/plugin marketplace add /path/to/codex-first
+/plugin install codex-first@graykode
 ```
 
-Then restart Claude Code when prompted. `/cheaploop` is now available in any project.
+Then restart Claude Code when prompted. `/codex-first:loop` is now available in any project.
 
 ## Usage
 
 Run one command inside Claude Code with this plugin loaded. For local development, open Claude Code in this repo.
 
 ```text
-/cheaploop <task>
+/codex-first:loop <task>
 ```
 
 Claude reads `AGENTS.md`, judges the task, and prints a verdict line plus a Unicode loop diagram immediately before dispatch. If requirements, a rubric, or acceptance criteria are unclear, Claude asks via `AskUserQuestion` before dispatching instead of guessing.
@@ -85,8 +87,8 @@ Multi-worker plans are mapped onto Claude Code's built-in Workflow tool so progr
 ```text
 AGENTS.md               # boss rules, worker contract, and repo conventions
 CLAUDE.md               # points Claude Code at AGENTS.md
-commands/cheaploop.md   # /cheaploop command entry point
+commands/loop.md        # /codex-first:loop command entry point
 scripts/dispatch.sh     # codex exec wrapper and result.json capture
 .claude-plugin/         # Claude Code plugin manifest
-.cheaploop/             # runtime data such as prompts, verification scratch files, and results
+.codex-first/           # runtime data such as prompts, verification scratch files, and results
 ```

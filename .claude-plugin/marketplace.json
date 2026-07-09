@@ -5,7 +5,7 @@
   },
   "plugins": [
     {
-      "name": "cheaploop",
+      "name": "codex-first",
       "source": "./",
       "description": "Claude is the brain, Codex is the hands. One command decides the loop."
     }

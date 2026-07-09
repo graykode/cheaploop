@@ -1,10 +1,10 @@
-# cheaploop
+# codex-first
 
 > Claude is the brain, Codex is the hands. One command decides the loop.
 
 A Claude Code-only plugin. **Claude = boss** (orchestration: decompose, route, mediate, integrate), **Codex = worker** (execution: all coding and research). The goal is saving Claude subscription tokens — Codex is flat-rate, so worker runs are never the thing to economize.
 
-The four loop levels follow LangChain's ["The Art of Loop Engineering"](https://www.langchain.com/blog/the-art-of-loop-engineering): **1 Agent Loop · 2 Verification Loop · 3 Event-Driven Loop · 4 Hill Climbing Loop**.
+Inspired by steipete's [codex-first skill](https://github.com/steipete/agent-scripts/blob/main/skills/codex-first/SKILL.md); the four loop levels follow LangChain's ["The Art of Loop Engineering"](https://www.langchain.com/blog/the-art-of-loop-engineering): **1 Agent Loop · 2 Verification Loop · 3 Event-Driven Loop · 4 Hill Climbing Loop**.
 
 ## Role detection
 
@@ -13,7 +13,7 @@ If your prompt contains a `TASK_ID`, you are a **worker** → follow the worker 
 ## Boss rules
 
 1. **Never do the work yourself.** Delegate all execution to workers. The only exception: when delegation overhead exceeds the task itself.
-2. **Never read raw worker output.** Read only `.cheaploop/results/<task-id>/result.json`.
+2. **Never read raw worker output.** Read only `.codex-first/results/<task-id>/result.json`.
 3. **Pick level, model, and effort per task, using your own judgment.** No fixed rule table. Difficulty and loop level are independent axes — difficulty drives model/effort choice; level is about whether verification or repetition is needed.
 4. **Never dispatch without the verdict and loop diagram already printed in the current response — this is a gate, not a suggestion.** Draw it with Unicode box characters. Level 2 example:
 
@@ -35,10 +35,10 @@ If your prompt contains a `TASK_ID`, you are a **worker** → follow the worker 
 
 ## Worker contract
 
-You are a cheaploop worker. The boss reads only your final summary JSON.
+You are a codex-first worker. The boss reads only your final summary JSON.
 
 1. Do only the assigned task. No scope expansion. If impossible, return `status: "blocked"`.
-2. Write deliverables to the repo or `.cheaploop/results/<task-id>/` as files. Keep stdout lean.
+2. Write deliverables to the repo or `.codex-first/results/<task-id>/` as files. Keep stdout lean.
 3. The last thing on stdout must be a single fenced code block tagged exactly ```json containing result.json (below). No prose after it. The wrapper is a tolerant reader that extracts the last valid result block; strictness is on the writer. Do not write the file yourself (the wrapper saves it).
 4. Never echo secret values in any output. If the task is secret scanning, report locations (`file:line`) only.
 5. `verify` tasks are adversarial — actually run things, and back every finding with file:line evidence.
@@ -61,9 +61,9 @@ Every key is always present (empty arrays / `null`, never omitted). `status` is 
 
 ```
 AGENTS.md      # single source of truth (CLAUDE.md is one line: @AGENTS.md)
-commands/      # /cheaploop single entry point
+commands/      # /codex-first:loop single entry point
 scripts/       # dispatch.sh — codex exec wrapper + result.json capture
-.cheaploop/    # runtime (gitignored) — results/
+.codex-first/  # runtime (gitignored) — results/
 ```
 
 This repo is developed the same way: implementation is delegated to workers; commit only when the user asks.

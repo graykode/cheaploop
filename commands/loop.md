@@ -27,8 +27,8 @@ Do not call `dispatch.sh` / Workflow until both are printed. Example:
 
 Re-show the diagram when the plan changes level or worker count mid-session.
 Generate each `TASK_ID` as `<slug>-<3-digit>`.
-Dispatch every worker through `${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh` with the task spec and selected model/effort. Runtime artifacts (`.cheaploop/`) are written under the current working project, not the plugin directory.
+Dispatch every worker through `${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh` with the task spec and selected model/effort. Runtime artifacts (`.codex-first/`) are written under the current working project, not the plugin directory.
 For multi-worker plans, run the pipeline through the Workflow tool — each agent stage invokes `${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh` via Bash — so progress is observable live in /workflows. Wrapper agents only relay a command, so give them the cheapest model (`model: 'haiku'`, `effort: 'low'`). Include the real worker model in each agent label, such as `audit:shell [gpt-5.5]`, because the tree's model column can only show the Claude wrapper. Single-worker runs may call the script directly.
-Read only `.cheaploop/results/<task-id>/result.json`; never inspect raw worker output.
+Read only `.codex-first/results/<task-id>/result.json`; never inspect raw worker output.
 If verification fails, retry implementation with feedback, up to 2 retries.
 Integrate successful worker results and report the outcome concisely.

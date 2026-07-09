@@ -1,4 +1,5 @@
-# cheaploop runtime artifacts
+# Runtime artifacts
+.codex-first/
 .cheaploop/
 .codex-home/
 

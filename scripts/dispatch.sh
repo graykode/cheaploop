@@ -20,9 +20,9 @@ require_command codex
 require_command python3
 
 append_worker_result_contract() {
-  cat <<'CHEAPLOOP_WORKER_RESULT_CONTRACT'
+  cat <<'CODEX_FIRST_WORKER_RESULT_CONTRACT'
 
-CHEAPLOOP WORKER RESULT CONTRACT
+CODEX-FIRST WORKER RESULT CONTRACT
 
 Your final result must be a JSON object with exactly this result.json shape:
 
@@ -54,7 +54,7 @@ Rules:
 
 Hard output rule:
 The LAST thing you print MUST be a single fenced code block tagged exactly ```json (three backticks + the word json, nothing else) containing only the result object. No prose after it.
-CHEAPLOOP_WORKER_RESULT_CONTRACT
+CODEX_FIRST_WORKER_RESULT_CONTRACT
 }
 
 if [ "${CHEAPLOOP_SNAPSHOT:-}" != "1" ]; then
@@ -64,7 +64,7 @@ if [ "${CHEAPLOOP_SNAPSHOT:-}" != "1" ]; then
   export CHEAPLOOP_ROOT="$script_root"
   export CHEAPLOOP_WORKDIR="$launch_workdir"
 
-  snapshot_path="$(mktemp "${TMPDIR:-/tmp}/cheaploop-dispatch.XXXXXX")" || die "cannot create dispatch snapshot"
+  snapshot_path="$(mktemp "${TMPDIR:-/tmp}/codex-first-dispatch.XXXXXX")" || die "cannot create dispatch snapshot"
   cp "${BASH_SOURCE[0]}" "$snapshot_path" || {
     rm -f "$snapshot_path"
     die "cannot copy dispatch snapshot"
@@ -169,7 +169,7 @@ else
 fi
 cd "$workdir" || die "cannot enter workdir"
 
-result_dir=".cheaploop/results/$task_id"
+result_dir=".codex-first/results/$task_id"
 raw_log="$result_dir/raw.log"
 result_json="$result_dir/result.json"
 codex_exit="$result_dir/codex_exit"
