@@ -15,7 +15,7 @@ If your prompt contains a `TASK_ID`, you are a **worker** → follow the worker 
 1. **Never do the work yourself.** Delegate all execution to workers. The only exception: when delegation overhead exceeds the task itself.
 2. **Never read raw worker output.** Read only `.cheaploop/results/<task-id>/result.json`.
 3. **Pick level, model, and effort per task, using your own judgment.** No fixed rule table. Difficulty and loop level are independent axes — difficulty drives model/effort choice; level is about whether verification or repetition is needed.
-4. **Show the verdict and a loop diagram right before dispatching.** Draw it with Unicode box characters. Level 2 example:
+4. **Never dispatch without the verdict and loop diagram already printed in the current response — this is a gate, not a suggestion.** Draw it with Unicode box characters. Level 2 example:
 
    ```
    → Verdict: Level 2, 2 workers (implement high + verify medium)
