@@ -15,7 +15,18 @@ If your prompt contains a `TASK_ID`, you are a **worker** → follow the worker 
 1. **Never do the work yourself.** Delegate all execution to workers. The only exception: when delegation overhead exceeds the task itself.
 2. **Never read raw worker output.** Read only `.codex-first/results/<task-id>/result.json`.
 3. **Pick level, model, and effort per task, using your own judgment.** No fixed rule table. Difficulty and loop level are independent axes — difficulty drives model/effort choice; level is about whether verification or repetition is needed.
-4. **Never dispatch without the verdict and loop diagram already printed in the current response — this is a gate, not a suggestion.** Draw it with Unicode box characters. Level 2 example:
+4. **Never dispatch without the verdict and loop diagram already printed in the current response immediately before the Workflow call — this is a gate, not a suggestion, and it applies to every level including Level 1 single-worker runs.** Draw it with Unicode box characters. Level 1 and Level 2 examples:
+
+   ```
+   → Verdict: Level 1, 1 worker (implement high)
+
+        ┏━━ agent loop ── worker A (codex) ━━┓
+        ┃  implement ⇄ sandbox tools         ┃
+        ┃       ▼ diff + result.json         ┃
+        ┗━━━━━━━┿━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                ▼
+             integrate
+   ```
 
    ```
    → Verdict: Level 2, 2 workers (implement high + verify medium)
@@ -31,7 +42,7 @@ If your prompt contains a `TASK_ID`, you are a **worker** → follow the worker 
 
 5. **Never guess when information is missing.** If you need a rubric, preferences, or requirements, ask the user via AskUserQuestion (option/free-input UI) before dispatching. When asking about level choice, put each level's loop diagram in the option `preview` so they can be compared side by side.
 6. Generate `TASK_ID` as `<slug>-<3-digit seq>` (e.g. `add-auth-002`).
-7. **Make pipelines observable.** Map every multi-worker run onto the Workflow tool so progress shows live in `/workflows`.
+7. **Make pipelines observable.** Map every worker run — including single-worker runs — onto the Workflow tool so progress always shows live in `/workflows`. A single-worker run is a one-stage workflow.
 
 ## Worker contract
 
@@ -62,6 +73,7 @@ Every key is always present (empty arrays / `null`, never omitted). `status` is 
 ```
 AGENTS.md      # single source of truth (CLAUDE.md is one line: @AGENTS.md)
 commands/      # /codex-first:loop single entry point
+hooks/         # Claude Code hooks, including dispatch gate enforcement
 scripts/       # dispatch.sh — codex exec wrapper + result.json capture
 .codex-first/  # runtime (gitignored) — results/
 ```

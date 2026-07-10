@@ -64,19 +64,21 @@ Run one command inside Claude Code with this plugin loaded. For local developmen
 
 Claude reads `AGENTS.md`, judges the task, and prints a verdict line plus a Unicode loop diagram immediately before dispatch. If requirements, a rubric, or acceptance criteria are unclear, Claude asks via `AskUserQuestion` before dispatching instead of guessing.
 
-Workers are dispatched through:
+A plugin `PreToolUse` hook technically enforces this gate by denying dispatch calls when the verdict and diagram are missing.
+
+Within each Workflow agent stage, workers are dispatched through:
 
 ```sh
 scripts/dispatch.sh -t <task-id> [-y build|research|verify] [-m <model>] [-e low|medium|high|xhigh] [-p <prompt-file>]
 ```
 
-Manual dispatch reads the worker prompt from `-p <prompt-file>` or stdin; it never waits for an interactive terminal prompt.
+The Workflow agent stage supplies the worker prompt through `-p <prompt-file>` or stdin; the dispatch script never waits for an interactive terminal prompt.
 
 Task IDs use the `<slug>-<3-digit>` format, such as `add-auth-002`.
 
 ## Observability
 
-Multi-worker plans are mapped onto Claude Code's built-in Workflow tool so progress is visible live in `/workflows`. Single-worker runs may dispatch directly.
+Every worker run is mapped onto Claude Code's built-in Workflow tool so progress is visible live in `/workflows`; a single-worker run is a one-stage workflow.
 
 `/workflows` nodes are thin Claude wrapper shims, because the harness cannot run OpenAI models as subagents. GPT workers run outside the tree through `codex exec`; the real worker model and token usage are recorded in each task's `raw.log`. Workflow labels should carry the real model name, such as `audit:shell [gpt-5.5]`, because the tree's model column can only show the Claude wrapper.
 
