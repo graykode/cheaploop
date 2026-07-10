@@ -34,6 +34,16 @@ def is_dispatch(payload):
     return "dispatch.sh" in script
 
 
+def is_subagent_session(payload):
+    # This PreToolUse hook also fires inside subagents (workflow stages, Task
+    # relays). Their transcripts can never contain the boss's verdict text, so
+    # the transcript check would deny every relayed dispatch. The gate has
+    # already been enforced on the top-level Workflow/Bash call that spawned
+    # them, so exempt subagent sessions entirely.
+    transcript = str(payload.get("transcript_path", "")).replace("\\", "/")
+    return "/subagents/" in transcript
+
+
 def is_genuine_user(entry):
     if entry.get("type") != "user" or entry.get("isMeta") is True:
         return False
@@ -96,6 +106,8 @@ def main():
     try:
         payload = json.load(sys.stdin)
         if not is_dispatch(payload):
+            return
+        if is_subagent_session(payload):
             return
         if has_gate_in_tool_input(payload):
             return

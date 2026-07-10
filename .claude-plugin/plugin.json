@@ -1,1 +1,5 @@
-{"name":"codex-first","version":"0.3.0","description":"Claude is the brain, Codex is the hands. One command decides the loop."}
+{
+  "name": "codex-first",
+  "version": "0.3.1",
+  "description": "Claude is the brain, Codex is the hands. One command decides the loop."
+}
