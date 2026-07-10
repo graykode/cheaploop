@@ -4,7 +4,7 @@ set -u
 set -o pipefail
 
 usage() {
-  printf '%s\n' "usage: scripts/dispatch.sh -t <task-id> [-y build|research|verify] [-m <model>] [-e low|medium|high|xhigh] [-p <prompt-file>]" >&2
+  printf '%s\n' "usage: scripts/dispatch.sh -t <task-id> [-y build|research|verify] [-m <model>] [-e low|medium|high|xhigh] [-s standard|fast] [-p <prompt-file>]" >&2
 }
 
 die() {
@@ -110,15 +110,17 @@ task_id=""
 task_type="build"
 model=""
 effort=""
+service_tier=""
 prompt_file=""
 start_dir="$(pwd)"
 
-while getopts ":t:y:m:e:p:" opt; do
+while getopts ":t:y:m:e:s:p:" opt; do
   case "$opt" in
     t) task_id="$OPTARG" ;;
     y) task_type="$OPTARG" ;;
     m) model="$OPTARG" ;;
     e) effort="$OPTARG" ;;
+    s) service_tier="$OPTARG" ;;
     p) prompt_file="$OPTARG" ;;
     :) die "-$OPTARG requires a value" ;;
     \?) die "unknown option -$OPTARG" ;;
@@ -148,6 +150,11 @@ esac
 case "$effort" in
   ""|low|medium|high|xhigh) ;;
   *) die "effort must be low, medium, high, or xhigh" ;;
+esac
+
+case "$service_tier" in
+  ""|standard|fast) ;;
+  *) die "service tier must be standard or fast" ;;
 esac
 
 if [ -n "$prompt_file" ]; then
@@ -209,6 +216,7 @@ append_worker_result_contract >> "$prompt_tmp" || die "cannot append worker resu
 cmd=(codex exec --sandbox "$sandbox")
 [ -z "$model" ] || cmd+=(-m "$model")
 [ -z "$effort" ] || cmd+=(-c "model_reasoning_effort=$effort")
+[ -z "$service_tier" ] || cmd+=(-c "service_tier=$service_tier")
 
 "${cmd[@]}" < "$prompt_tmp" > "$raw_log" 2>&1
 codex_status=$?

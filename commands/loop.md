@@ -39,7 +39,7 @@ The plugin `PreToolUse` hook technically enforces this gate by denying dispatch 
 
 Re-show the diagram when the plan changes level or worker count mid-session.
 Generate each `TASK_ID` as `<slug>-<3-digit>`.
-Dispatch every worker through `${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh` with the task spec and selected model/effort. Runtime artifacts (`.codex-first/`) are written under the current working project, not the plugin directory.
+Dispatch every worker through `${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh` with the task spec and selected model/effort/service tier. Every dispatch must pass `-m` and `-e` explicitly, plus `-s` when the tier should differ from standard judgment — never rely on `~/.codex/config.toml` defaults. Runtime artifacts (`.codex-first/`) are written under the current working project, not the plugin directory.
 Run every worker run through the Workflow tool so progress is observable live in /workflows; a single-worker run is a one-stage workflow. Each agent stage invokes `${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh` via Bash. Wrapper agents only relay a command, so give them the cheapest model (`model: 'haiku'`, `effort: 'low'`). Include the real worker model in each agent label, such as `audit:shell [gpt-5.5]`, because the tree's model column can only show the Claude wrapper.
 Read only `.codex-first/results/<task-id>/result.json`; never inspect raw worker output.
 If verification fails, retry implementation with feedback, up to 2 retries.
